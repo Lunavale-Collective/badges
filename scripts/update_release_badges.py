@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Shields endpoint JSON for Lunavale release milestones."""
+"""Generate Shields endpoint JSON for Lunavale roadmap badges."""
 
 from __future__ import annotations
 
@@ -19,7 +19,13 @@ API_ROOT = "https://api.github.com"
 OWNER = os.environ.get("ROADMAP_OWNER", "Lunavale-Collective")
 ROADMAP_REPO = os.environ.get("ROADMAP_REPO", f"{OWNER}/scripts-roadmap")
 ROADMAP_REF = os.environ.get("ROADMAP_REF", "main")
-OUTPUT_DIR = Path(os.environ.get("BADGE_OUTPUT_DIR", ".badges/releases"))
+RELEASE_OUTPUT_DIR = Path(
+    os.environ.get(
+        "RELEASE_BADGE_OUTPUT_DIR",
+        os.environ.get("BADGE_OUTPUT_DIR", ".badges/releases"),
+    )
+)
+ROADMAP_OUTPUT_DIR = Path(os.environ.get("ROADMAP_BADGE_OUTPUT_DIR", ".badges/roadmap"))
 LOCAL_ROADMAP_ROOT = Path(os.environ.get("ROADMAP_LOCAL_ROOT", "../scripts-roadmap"))
 TOKEN = (
     os.environ.get("ROADMAP_BADGE_TOKEN")
@@ -27,6 +33,7 @@ TOKEN = (
     or os.environ.get("GITHUB_TOKEN")
 )
 ALLOW_TBD = os.environ.get("ALLOW_TBD_BADGES", "").lower() in {"1", "true", "yes"}
+ACTIVE_STATUSES = {"planned", "in_progress"}
 
 RELEASES = [
     {
@@ -136,6 +143,15 @@ def date_message(date_text: str | None) -> str | None:
     return f"{value.strftime('%b')} {value.day}, {value.year}"
 
 
+def parse_iso_date(date_text: str | None) -> dt.date | None:
+    if not date_text:
+        return None
+    try:
+        return dt.date.fromisoformat(date_text)
+    except ValueError:
+        return None
+
+
 def search_issue(release_id: str) -> dict[str, str | None] | None:
     marker = f"ID: {release_id}"
     query = f'org:{OWNER} type:issue in:body "{marker}"'
@@ -188,13 +204,81 @@ def read_local_issue_file(release_id: str) -> dict[str, str | None] | None:
     return values
 
 
+def read_local_issue_files() -> dict[str, dict[str, str | None]]:
+    issue_dir = LOCAL_ROADMAP_ROOT / "data" / "issues"
+    if not issue_dir.exists():
+        return {}
+
+    issues: dict[str, dict[str, str | None]] = {}
+    for issue_path in sorted(issue_dir.glob("*.yml")):
+        values = parse_scalar_yaml(issue_path.read_text(encoding="utf-8"))
+        issue_id = values.get("id") or issue_path.stem
+        if not issue_id:
+            continue
+        values["id"] = issue_id
+        values["source"] = "local_roadmap_yml"
+        values["source_url"] = str(issue_path)
+        issues[str(issue_id)] = values
+    return issues
+
+
+def issue_sort_date(issue: dict[str, str | None]) -> dt.date:
+    for key in ("start", "end"):
+        value = parse_iso_date(issue.get(key))
+        if value:
+            return value
+    return dt.date.max
+
+
+def current_phase(issues: dict[str, dict[str, str | None]]) -> dict[str, str | None]:
+    today_text = os.environ.get("ROADMAP_TODAY")
+    today = dt.date.fromisoformat(today_text) if today_text else dt.date.today()
+    active = [
+        issue
+        for issue in issues.values()
+        if (issue.get("status") or "").lower() in ACTIVE_STATUSES
+    ]
+    if not active:
+        return {
+            "label": "Current Phase",
+            "message": "No active phase",
+            "color": "lightgrey",
+            "issue_id": None,
+            "parent_id": None,
+        }
+
+    current = []
+    for issue in active:
+        start = parse_iso_date(issue.get("start"))
+        end = parse_iso_date(issue.get("end"))
+        if start and end and start <= today <= end:
+            current.append(issue)
+
+    upcoming = [
+        issue
+        for issue in active
+        if (parse_iso_date(issue.get("start")) or dt.date.min) >= today
+    ]
+    selected = sorted(current or upcoming or active, key=issue_sort_date)[0]
+    parent_id = selected.get("parent")
+    parent = issues.get(str(parent_id)) if parent_id else None
+    title = (parent or selected).get("title") or parent_id or selected.get("id") or "Unknown"
+    return {
+        "label": "Current Phase",
+        "message": str(title),
+        "color": "0969da",
+        "issue_id": selected.get("id"),
+        "parent_id": parent_id,
+    }
+
+
 def load_release(release: dict[str, str]) -> dict[str, str | None]:
     release_id = release["id"]
-    values = search_issue(release_id)
+    values = read_local_issue_file(release_id)
+    if values is None:
+        values = search_issue(release_id)
     if values is None:
         values = read_github_issue_file(release_id)
-    if values is None:
-        values = read_local_issue_file(release_id)
     if values is None:
         values = {"id": release_id, "source": "missing"}
 
@@ -229,7 +313,8 @@ def write_badge(path: Path, *, label: str, message: str, color: str) -> None:
 
 
 def main() -> int:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    RELEASE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    ROADMAP_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     resolved = [load_release(release) for release in RELEASES]
 
     missing = [item["id"] for item in resolved if not item.get("end")]
@@ -244,7 +329,7 @@ def main() -> int:
         message = date_message(item.get("end")) or "TBD"
         color = item["color"] if item.get("end") else "lightgrey"
         write_badge(
-            OUTPUT_DIR / f"{item['id']}.json",
+            RELEASE_OUTPUT_DIR / f"{item['id']}.json",
             label=item["label"],
             message=message,
             color=color,
@@ -266,13 +351,26 @@ def main() -> int:
             for item in resolved
         ],
     }
-    (OUTPUT_DIR / "index.json").write_text(
+    (RELEASE_OUTPUT_DIR / "index.json").write_text(
         json.dumps(index, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    phase = current_phase(read_local_issue_files())
+    write_badge(
+        ROADMAP_OUTPUT_DIR / "current-phase.json",
+        label=str(phase["label"]),
+        message=str(phase["message"]),
+        color=str(phase["color"]),
+    )
+    (ROADMAP_OUTPUT_DIR / "current-phase-meta.json").write_text(
+        json.dumps(phase, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
     for item in resolved:
         print(f"{item['id']}: {item['message']} ({item['source']})")
+    print(f"current-phase: {phase['message']}")
     return 0
 
 

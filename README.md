@@ -15,7 +15,8 @@ Examples:
 - `https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Lunavale-Collective/badges/main/.badges/releases/public-beta.json`
 - `https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Lunavale-Collective/badges/main/.badges/releases/public-early-release.json`
 - `https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Lunavale-Collective/badges/main/.badges/releases/public-release.json`
+- `https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Lunavale-Collective/badges/main/.badges/roadmap/current-phase.json`
 
-The update workflow checks GitHub issues first for matching roadmap IDs, then falls back to `scripts-roadmap/data/issues/<id>.yml`.
+The update workflow checks out `scripts-roadmap`, reads local roadmap YAML files first, and can fall back to GitHub issues or the roadmap file API when local files are unavailable.
 
 Because the roadmap and issue repositories are private, configure a repository secret named `ROADMAP_BADGE_TOKEN` with read access to the private roadmap/issues and write access is not required for those private repos. The script can also use `GH_TOKEN` if that secret already exists. The workflow's normal `GITHUB_TOKEN` is only used to commit generated JSON back to this public badge repo.

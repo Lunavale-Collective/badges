@@ -16,6 +16,13 @@ jobs:
       - name: Check out badge repo
         uses: actions/checkout@v4
 
+      - name: Check out roadmap repo
+        uses: actions/checkout@v4
+        with:
+          repository: Lunavale-Collective/scripts-roadmap
+          path: roadmap-source
+          token: ${{ secrets.ROADMAP_BADGE_TOKEN || secrets.GH_TOKEN }}
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -27,16 +34,17 @@ jobs:
           ROADMAP_BADGE_TOKEN: ${{ secrets.ROADMAP_BADGE_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
+          ROADMAP_LOCAL_ROOT: roadmap-source
 
       - name: Commit badge updates
         run: |
-          if git diff --quiet -- .badges/releases; then
+          if git diff --quiet -- .badges/releases .badges/roadmap; then
             echo "No badge changes."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .badges/releases
-          git commit -m "Update release badge data"
+          git add .badges/releases .badges/roadmap
+          git commit -m "Update badge data"
           git push
