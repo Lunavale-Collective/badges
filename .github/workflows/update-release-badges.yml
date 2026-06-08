@@ -2,12 +2,6 @@ name: Update release badges
 
 on:
   workflow_dispatch:
-    inputs:
-      force_commit:
-        description: "Create an empty commit when badge data has no changes"
-        required: false
-        default: false
-        type: boolean
   schedule:
     - cron: "17 */6 * * *"
 
@@ -35,23 +29,14 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
       - name: Commit badge updates
-        env:
-          FORCE_COMMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.force_commit }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           if git diff --quiet -- .badges/releases; then
-            if [ "$FORCE_COMMIT" = "true" ]; then
-              git commit --allow-empty -m "Test release badge workflow"
-              git push
-              exit 0
-            fi
-
             echo "No badge changes."
             exit 0
           fi
 
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .badges/releases
           git commit -m "Update release badge data"
           git push

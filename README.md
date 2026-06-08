@@ -19,5 +19,3 @@ Examples:
 The update workflow checks GitHub issues first for matching roadmap IDs, then falls back to `scripts-roadmap/data/issues/<id>.yml`.
 
 Because the roadmap and issue repositories are private, configure a repository secret named `ROADMAP_BADGE_TOKEN` with read access to the private roadmap/issues and write access is not required for those private repos. The script can also use `GH_TOKEN` if that secret already exists. The workflow's normal `GITHUB_TOKEN` is only used to commit generated JSON back to this public badge repo.
-
-The workflow can be run manually from GitHub Actions. Use the `force_commit` option when testing the token or workflow path and you want a pushed test commit even if the generated badge JSON is already current.
