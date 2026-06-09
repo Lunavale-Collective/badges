@@ -1,0 +1,58 @@
+name: Weekly roadmap planner
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Sunday 1:00 AM EST / 2:00 AM EDT in New York.
+    - cron: "0 6 * * 0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-roadmap-planner
+  cancel-in-progress: false
+
+jobs:
+  run-roadmap-planner:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check required secrets
+        run: |
+          if [ -z "$ROADMAP_DEPLOY_KEY" ]; then
+            echo "::error::ROADMAP_DEPLOY_KEY is required to check out scripts-roadmap over SSH."
+            exit 1
+          fi
+
+          if [ -z "$ROADMAP_SYNC_TOKEN" ]; then
+            echo "::error::ROADMAP_SYNC_TOKEN is required for issue_planner.py GitHub issue and Project sync."
+            exit 1
+          fi
+        env:
+          ROADMAP_DEPLOY_KEY: ${{ secrets.ROADMAP_DEPLOY_KEY }}
+          ROADMAP_SYNC_TOKEN: ${{ secrets.ROADMAP_SYNC_TOKEN }}
+
+      - name: Check out roadmap repo
+        uses: actions/checkout@v4
+        with:
+          repository: Lunavale-Collective/scripts-roadmap
+          ref: main
+          path: scripts-roadmap
+          ssh-key: ${{ secrets.ROADMAP_DEPLOY_KEY }}
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Run planner self-test
+        working-directory: scripts-roadmap
+        run: PYTHONDONTWRITEBYTECODE=1 python3 issue_planner.py --self-test
+
+      - name: Run full roadmap planner sync
+        working-directory: scripts-roadmap
+        run: PYTHONDONTWRITEBYTECODE=1 python3 issue_planner.py --full-run
+        env:
+          GH_TOKEN: ${{ secrets.ROADMAP_SYNC_TOKEN }}
