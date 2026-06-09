@@ -25,13 +25,13 @@ jobs:
             exit 1
           fi
 
-          if [ -z "$ROADMAP_SYNC_TOKEN" ]; then
-            echo "::error::ROADMAP_SYNC_TOKEN is required for issue_planner.py GitHub issue and Project sync."
+          if [ -z "$ROADMAP_SYNC_KEY" ]; then
+            echo "::error::ROADMAP_SYNC_KEY is required for issue_planner.py GitHub issue and Project sync."
             exit 1
           fi
         env:
           ROADMAP_DEPLOY_KEY: ${{ secrets.ROADMAP_DEPLOY_KEY }}
-          ROADMAP_SYNC_TOKEN: ${{ secrets.ROADMAP_SYNC_TOKEN }}
+          ROADMAP_SYNC_KEY: ${{ secrets.ROADMAP_SYNC_KEY }}
 
       - name: Check out roadmap repo
         uses: actions/checkout@v4
@@ -55,4 +55,4 @@ jobs:
         working-directory: scripts-roadmap
         run: PYTHONDONTWRITEBYTECODE=1 python3 issue_planner.py --full-run
         env:
-          GH_TOKEN: ${{ secrets.ROADMAP_SYNC_TOKEN }}
+          GH_TOKEN: ${{ secrets.ROADMAP_SYNC_KEY }}
