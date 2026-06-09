@@ -4,6 +4,11 @@ This is a public repository for running shared Lunavale organization workflows a
 
 Keeping shared automation here lets Lunavale run lightweight workflows from one place while keeping private roadmap, service, game, and planning repositories private. Some generated outputs, such as badges and status files, are intentionally public so profile pages and documentation can reference stable URLs.
 
+## Workflow Health Check
+
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Lunavale-Collective/workflows/update-release-badges.yml?label=Update%20Release%20Badges)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Lunavale-Collective/workflows/weekly-roadmap-planner.yml?label=Weekly%20Roadmap%20Planner)
+
 ## Generated Badges
 
 ![Current Phase](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Lunavale-Collective/workflows/main/.badges/roadmap/current-phase.json)

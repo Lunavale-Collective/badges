@@ -1,4 +1,4 @@
-name: Weekly roadmap planner
+name: Weekly Roadmap Planner
 
 on:
   workflow_dispatch:

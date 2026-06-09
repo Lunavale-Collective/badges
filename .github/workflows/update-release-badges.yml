@@ -1,4 +1,4 @@
-name: Update release badges
+name: Update Release Badges
 
 on:
   workflow_dispatch:
