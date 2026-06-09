@@ -16,12 +16,23 @@ jobs:
       - name: Check out badge repo
         uses: actions/checkout@v4
 
+      - name: Check roadmap token
+        run: |
+          if [ -z "$ROADMAP_BADGE_TOKEN" ]; then
+            echo "::error::ROADMAP_BADGE_TOKEN is required to read the private scripts-roadmap repo."
+            exit 1
+          fi
+        env:
+          ROADMAP_BADGE_TOKEN: ${{ secrets.ROADMAP_BADGE_TOKEN }}
+
       - name: Check out roadmap repo
         uses: actions/checkout@v4
         with:
           repository: Lunavale-Collective/scripts-roadmap
+          ref: main
           path: roadmap-source
-          token: ${{ secrets.ROADMAP_BADGE_TOKEN || secrets.GH_TOKEN }}
+          token: ${{ secrets.ROADMAP_BADGE_TOKEN }}
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v5
