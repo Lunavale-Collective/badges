@@ -8,6 +8,8 @@ Keeping shared automation here lets Lunavale run lightweight workflows from one 
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Lunavale-Collective/workflows/update-release-badges.yml?label=Update%20Release%20Badges)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Lunavale-Collective/workflows/weekly-roadmap-planner.yml?label=Weekly%20Roadmap%20Planner)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Lunavale-Collective/workflows/validate-service-repos.yml?label=Validate%20Service%20Repos)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Lunavale-Collective/workflows/validate-docs-roadmap.yml?label=Validate%20Docs%20And%20Roadmap)
 
 ## Generated Badges
 

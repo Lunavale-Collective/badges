@@ -1,0 +1,85 @@
+name: Validate Docs And Roadmap
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check required token
+        run: |
+          if [ -z "$PRIVATE_REPOS_READ_TOKEN" ]; then
+            echo "::error::PRIVATE_REPOS_READ_TOKEN is required to check out the private docs repo."
+            exit 1
+          fi
+        env:
+          PRIVATE_REPOS_READ_TOKEN: ${{ secrets.PRIVATE_REPOS_READ_TOKEN }}
+
+      - name: Check out docs repo
+        uses: actions/checkout@v4
+        with:
+          repository: Lunavale-Collective/docs
+          ref: main
+          path: docs
+          token: ${{ secrets.PRIVATE_REPOS_READ_TOKEN }}
+          persist-credentials: false
+
+      - name: Validate markdown basics
+        working-directory: docs
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          failed = False
+          for path in sorted(Path(".").rglob("*.md")):
+              text = path.read_text(encoding="utf-8")
+              if text and not text.endswith("\n"):
+                  print(f"{path}: missing trailing newline")
+                  failed = True
+              for line_no, line in enumerate(text.splitlines(), start=1):
+                  if line.rstrip() != line:
+                      print(f"{path}:{line_no}: trailing whitespace")
+                      failed = True
+
+          raise SystemExit(1 if failed else 0)
+          PY
+
+  validate-roadmap:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check roadmap deploy key
+        run: |
+          if [ -z "$ROADMAP_DEPLOY_KEY" ]; then
+            echo "::error::ROADMAP_DEPLOY_KEY is required to check out scripts-roadmap over SSH."
+            exit 1
+          fi
+        env:
+          ROADMAP_DEPLOY_KEY: ${{ secrets.ROADMAP_DEPLOY_KEY }}
+
+      - name: Check out roadmap repo
+        uses: actions/checkout@v4
+        with:
+          repository: Lunavale-Collective/scripts-roadmap
+          ref: main
+          path: scripts-roadmap
+          ssh-key: ${{ secrets.ROADMAP_DEPLOY_KEY }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Run planner self-test
+        working-directory: scripts-roadmap
+        run: PYTHONDONTWRITEBYTECODE=1 python3 issue_planner.py --self-test
+
+      - name: Run local roadmap dry-run
+        working-directory: scripts-roadmap
+        run: PYTHONDONTWRITEBYTECODE=1 python3 issue_planner.py --commit --dry-run --local-only --today 2026-06-08

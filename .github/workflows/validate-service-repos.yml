@@ -1,0 +1,69 @@
+name: Validate Service Repos
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-service:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        repo:
+          - service-admin
+          - service-auth
+          - service-economy
+          - service-gateway
+          - service-infra
+          - service-player
+          - service-purchase
+          - service-website
+
+    steps:
+      - name: Check required token
+        run: |
+          if [ -z "$PRIVATE_REPOS_READ_TOKEN" ]; then
+            echo "::error::PRIVATE_REPOS_READ_TOKEN is required to check out private service repos."
+            exit 1
+          fi
+        env:
+          PRIVATE_REPOS_READ_TOKEN: ${{ secrets.PRIVATE_REPOS_READ_TOKEN }}
+
+      - name: Check out service repo
+        uses: actions/checkout@v4
+        with:
+          repository: Lunavale-Collective/${{ matrix.repo }}
+          ref: main
+          path: service
+          token: ${{ secrets.PRIVATE_REPOS_READ_TOKEN }}
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: service/package-lock.json
+
+      - name: Install dependencies
+        working-directory: service
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: service
+        run: npm run typecheck
+
+      - name: Lint
+        working-directory: service
+        run: npm run lint
+
+      - name: Test
+        working-directory: service
+        run: npm test
+
+      - name: Build
+        working-directory: service
+        run: npm run build
