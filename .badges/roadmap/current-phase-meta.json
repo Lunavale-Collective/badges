@@ -1,7 +1,7 @@
 {
   "color": "0969da",
-  "issue_id": "create-one-command-local-dev-stack",
+  "issue_id": "auth-project-bootstrap",
   "label": "Current Phase",
-  "message": "Repository and local development foundation",
-  "parent_id": "repository-and-local-dev-foundation"
+  "message": "Auth service MVP",
+  "parent_id": "auth-service-mvp"
 }
