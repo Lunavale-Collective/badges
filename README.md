@@ -13,8 +13,8 @@ Keeping shared automation here lets Lunavale run lightweight workflows from one 
 
 ## Generated Badges
 
-![Current Phase](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Lunavale-Collective/workflows/main/.badges/roadmap/current-phase.json)
 ![Last Phase](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Lunavale-Collective/workflows/main/.badges/roadmap/last-phase.json)
+![Current Phase](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Lunavale-Collective/workflows/main/.badges/roadmap/current-phase.json)
 ![Next Phase](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Lunavale-Collective/workflows/main/.badges/roadmap/next-phase.json)
 
 ![Run Roadmap Planner](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/Lunavale-Collective/workflows/main/.badges/workflows/roadmap-updated.json)
