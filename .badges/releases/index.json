@@ -1,43 +1,43 @@
 {
   "releases": [
     {
-      "end": "2026-11-19",
+      "end": "2026-11-15",
       "id": "internal-alpha",
       "label": "Internal Alpha",
-      "message": "Nov 19, 2026",
-      "start": "2026-11-18",
+      "message": "Nov 15, 2026",
+      "start": "2026-11-14",
       "status": "planned"
     },
     {
-      "end": "2028-03-31",
+      "end": "2028-03-27",
       "id": "internal-beta",
       "label": "Internal Beta",
-      "message": "Mar 31, 2028",
-      "start": "2028-03-30",
+      "message": "Mar 27, 2028",
+      "start": "2028-03-26",
       "status": "planned"
     },
     {
-      "end": "2028-05-05",
+      "end": "2028-05-01",
       "id": "public-beta",
       "label": "Public Beta",
-      "message": "May 5, 2028",
-      "start": "2028-05-04",
+      "message": "May 1, 2028",
+      "start": "2028-04-30",
       "status": "planned"
     },
     {
-      "end": "2028-07-01",
+      "end": "2028-06-27",
       "id": "public-early-release",
       "label": "Public Early Release",
-      "message": "Jul 1, 2028",
-      "start": "2028-06-30",
+      "message": "Jun 27, 2028",
+      "start": "2028-06-26",
       "status": "planned"
     },
     {
-      "end": "2028-09-30",
+      "end": "2028-09-26",
       "id": "public-release",
       "label": "Public Release",
-      "message": "Sep 30, 2028",
-      "start": "2028-09-29",
+      "message": "Sep 26, 2028",
+      "start": "2028-09-25",
       "status": "planned"
     }
   ],
