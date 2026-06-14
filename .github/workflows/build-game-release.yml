@@ -2,6 +2,12 @@ name: Build Game Release
 
 on:
   workflow_dispatch:
+    inputs:
+      release_note:
+        description: Text to show under the Release Note section.
+        required: true
+        default: Initial Alpha Release
+        type: string
 
 permissions:
   contents: read
@@ -282,6 +288,14 @@ jobs:
 
       - name: Write release notes
         run: |
+          set -euo pipefail
+
+          release_note="${RELEASE_NOTE_TEXT//$'\r'/}"
+          if [ -z "${release_note//[[:space:]]/}" ]; then
+            echo "::error::Release note text cannot be empty."
+            exit 1
+          fi
+
           cat > release-notes.md <<EOF
           # ⚠️ Confidential Access Warning
 
@@ -293,22 +307,31 @@ jobs:
 
           ---
 
-          Lunavale game build ${VERSION}
+          **Release Note:**
 
-          Source repository: Lunavale-Collective/game-unity
-          Source commit: ${SOURCE_SHA}
-          Unity editor version: ${UNITY_EDITOR_VERSION}
-          Unity bundle version: ${VERSION}
-          Build timestamp UTC: ${BUILD_DATE} ${BUILD_TIME}
-          Repo files SHA-256: ${REPO_HASH}
-          Release hash suffix: ${RELEASE_HASH_SUFFIX}
+          EOF
 
-          Platforms:
-          - windows_x64
-          - macos_arm64
-          - linux_x64
+          printf '%s\n\n' "$release_note" >> release-notes.md
+
+          cat >> release-notes.md <<EOF
+          ---
+          <sup>Lunavale game build ${VERSION}</sup>
+
+          <sup>Source repository: Lunavale-Collective/game-unity</sup><br>
+          <sup>Source commit: ${SOURCE_SHA}</sup><br>
+          <sup>Unity editor version: ${UNITY_EDITOR_VERSION}</sup><br>
+          <sup>Unity bundle version: ${VERSION}</sup><br>
+          <sup>Build timestamp UTC: ${BUILD_DATE} ${BUILD_TIME}</sup><br>
+          <sup>Repo files SHA-256: ${REPO_HASH}</sup><br>
+          <sup>Release hash suffix: ${RELEASE_HASH_SUFFIX}</sup>
+
+          <sup>Platforms:</sup><br>
+          <sup>windows_x64</sup><br>
+          <sup>macos_arm64</sup><br>
+          <sup>linux_x64</sup>
           EOF
         env:
+          RELEASE_NOTE_TEXT: ${{ inputs.release_note }}
           VERSION: ${{ needs.version-gate.outputs.version }}
           SOURCE_SHA: ${{ needs.version-gate.outputs.source_sha }}
           UNITY_EDITOR_VERSION: ${{ needs.version-gate.outputs.unity_editor_version }}
