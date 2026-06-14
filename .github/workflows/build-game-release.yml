@@ -70,6 +70,7 @@ jobs:
           path: game-unity
           token: ${{ secrets.PRIVATE_REPOS_READ_TOKEN }}
           fetch-depth: 0
+          lfs: true
           persist-credentials: false
 
       - name: Read Unity release metadata and enforce version gate
@@ -122,6 +123,7 @@ jobs:
           ref: ${{ needs.version-gate.outputs.source_sha }}
           path: game-unity
           token: ${{ secrets.PRIVATE_REPOS_READ_TOKEN }}
+          lfs: true
           persist-credentials: false
 
       - name: Build Unity player
@@ -160,6 +162,25 @@ jobs:
 
           chmod +x "$player" || sudo chmod +x "$player"
 
+      - name: Install Linux player smoke dependencies
+        if: matrix.asset_os == 'linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+
+          audio_package="libasound2t64"
+          if ! apt-cache show "$audio_package" >/dev/null 2>&1; then
+            audio_package="libasound2"
+          fi
+
+          sudo apt-get install -y \
+            xvfb \
+            libglu1-mesa \
+            libgtk-3-0 \
+            libnss3 \
+            libxss1 \
+            "$audio_package"
+
       - name: Smoke Linux player startup
         if: matrix.asset_os == 'linux'
         run: |
@@ -172,7 +193,29 @@ jobs:
             exit 1
           fi
 
-          "$player" -batchmode -nographics -lunavaleSmokeQuit -logFile "$log"
+          export LIBGL_ALWAYS_SOFTWARE=1
+
+          set +e
+          timeout 90s xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+            "$player" \
+            -batchmode \
+            -force-glcore \
+            -screen-fullscreen 0 \
+            -screen-width 640 \
+            -screen-height 360 \
+            -lunavaleSmokeQuit \
+            -logFile "$log"
+          exit_code=$?
+          set -e
+
+          if [ "$exit_code" -ne 0 ]; then
+            echo "::error::Linux player smoke exited with code $exit_code."
+            if [ -f "$log" ]; then
+              cat "$log"
+            fi
+            exit "$exit_code"
+          fi
+
           if ! grep -q "Lunavale player smoke startup reached" "$log"; then
             echo "::error::Linux player smoke log did not contain the expected startup marker."
             cat "$log"
@@ -240,6 +283,16 @@ jobs:
       - name: Write release notes
         run: |
           cat > release-notes.md <<EOF
+          # ⚠️ Confidential Access Warning
+
+          **Authorized testers and appointed ExoHayvan LLC members only.**
+
+          Stop before you open, download, copy, share, stream, archive, reverse engineer, discuss, disclose, or distribute anything in this release. If you are not an approved Lunavale tester under NDA or an appointed ExoHayvan LLC member using these materials for approved company work, leave immediately and notify the Lunavale team that you reached this page.
+
+          Access is logged. Unauthorized access, use, or disclosure may result in access revocation, evidence preservation, civil claims, damages, injunctive relief, and referral to the appropriate authorities where applicable. These builds and all related materials are confidential property of ExoHayvan LLC.
+
+          ---
+
           Lunavale game build ${VERSION}
 
           Source repository: Lunavale-Collective/game-unity
@@ -268,7 +321,7 @@ jobs:
         run: |
           set -euo pipefail
           prerelease_flag=""
-          if [ "$IS_PRERELEASE" = "true" ]; then
+          if [ "$IS_PRERELEASE" = "true" ] || [[ "$RELEASE_TAG" =~ -(alpha|beta|rc)(\.|-|$) ]]; then
             prerelease_flag="--prerelease"
           fi
 
