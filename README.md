@@ -7,6 +7,7 @@ Keeping shared automation here lets Lunavale run lightweight workflows from one 
 ## Workflow Health Check
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Lunavale-Collective/workflows/update-release-badges.yml?label=Update%20Release%20Badges)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Lunavale-Collective/workflows/build-game-release.yml?label=Build%20Game%20Release)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Lunavale-Collective/workflows/run-roadmap-planner.yml?label=Run%20Roadmap%20Planner)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Lunavale-Collective/workflows/validate-service-repos.yml?label=Validate%20Service%20Repos)
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Lunavale-Collective/workflows/validate-docs-roadmap.yml?label=Validate%20Docs%20And%20Roadmap)

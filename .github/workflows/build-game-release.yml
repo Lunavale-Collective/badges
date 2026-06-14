@@ -1,0 +1,257 @@
+name: Build Game Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-game-release
+  cancel-in-progress: false
+
+jobs:
+  version-gate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+      is_prerelease: ${{ steps.metadata.outputs.is_prerelease }}
+      build_date: ${{ steps.metadata.outputs.build_date }}
+      build_time: ${{ steps.metadata.outputs.build_time }}
+      repo_files_sha256: ${{ steps.metadata.outputs.repo_files_sha256 }}
+      source_sha: ${{ steps.metadata.outputs.source_sha }}
+      unity_editor_version: ${{ steps.metadata.outputs.unity_editor_version }}
+
+    steps:
+      - name: Check required secrets
+        run: |
+          if [ -z "$PRIVATE_REPOS_READ_TOKEN" ]; then
+            echo "::error::PRIVATE_REPOS_READ_TOKEN is required to check out game-unity."
+            exit 1
+          fi
+
+          if [ -z "$GAME_BUILDS_RELEASE_TOKEN" ]; then
+            echo "::error::GAME_BUILDS_RELEASE_TOKEN is required to read and publish game-builds releases."
+            exit 1
+          fi
+
+          if [ -z "$UNITY_LICENSE" ]; then
+            echo "::error::UNITY_LICENSE is required for Unity CI builds."
+            exit 1
+          fi
+        env:
+          PRIVATE_REPOS_READ_TOKEN: ${{ secrets.PRIVATE_REPOS_READ_TOKEN }}
+          GAME_BUILDS_RELEASE_TOKEN: ${{ secrets.GAME_BUILDS_RELEASE_TOKEN }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+
+      - name: Check out workflows repo
+        uses: actions/checkout@v4
+
+      - name: Check out game-unity
+        uses: actions/checkout@v4
+        with:
+          repository: Lunavale-Collective/game-unity
+          ref: main
+          path: game-unity
+          token: ${{ secrets.PRIVATE_REPOS_READ_TOKEN }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Read Unity release metadata and enforce version gate
+        id: metadata
+        run: |
+          python3 scripts/game_release_metadata.py \
+            --repo-root game-unity \
+            --project-root game-unity/src \
+            --release-repo Lunavale-Collective/game-builds
+        env:
+          GAME_BUILDS_RELEASE_TOKEN: ${{ secrets.GAME_BUILDS_RELEASE_TOKEN }}
+
+  build:
+    needs: version-gate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - asset_os: windows
+            asset_arch: x64
+            target_platform: StandaloneWindows64
+            unity_arch: x64
+            package_ext: zip
+            output_name: Lunavale.exe
+            build_profile: ""
+          - asset_os: macos
+            asset_arch: arm64
+            target_platform: StandaloneOSX
+            unity_arch: arm64
+            package_ext: zip
+            output_name: Lunavale.app
+            build_profile: Assets/Settings/Build Profiles/macOS.asset
+          - asset_os: linux
+            asset_arch: x64
+            target_platform: StandaloneLinux64
+            unity_arch: x64
+            package_ext: tar.gz
+            output_name: Lunavale.x86_64
+            build_profile: ""
+
+    steps:
+      - name: Check out workflows repo
+        uses: actions/checkout@v4
+
+      - name: Check out game-unity
+        uses: actions/checkout@v4
+        with:
+          repository: Lunavale-Collective/game-unity
+          ref: ${{ needs.version-gate.outputs.source_sha }}
+          path: game-unity
+          token: ${{ secrets.PRIVATE_REPOS_READ_TOKEN }}
+          persist-credentials: false
+
+      - name: Build Unity player
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: game-unity/src
+          unityVersion: ${{ needs.version-gate.outputs.unity_editor_version }}
+          targetPlatform: ${{ matrix.target_platform }}
+          buildProfile: ${{ matrix.build_profile }}
+          buildMethod: Lunavale.EditorTools.LunavaleBuildAutomation.BuildFromCommandLine
+          buildName: Lunavale
+          buildsPath: game-unity/src/Builds/${{ matrix.asset_os }}_${{ matrix.asset_arch }}
+          versioning: Custom
+          version: ${{ needs.version-gate.outputs.version }}
+          customParameters: >
+            -lunavaleBuildTarget ${{ matrix.target_platform }}
+            -lunavaleBuildArch ${{ matrix.unity_arch }}
+            -lunavaleBuildName Lunavale
+            -lunavaleBuildPath Builds/${{ matrix.asset_os }}_${{ matrix.asset_arch }}/${{ matrix.output_name }}
+
+      - name: Package build
+        id: package
+        run: |
+          set -euo pipefail
+
+          asset_name="${ASSET_OS}_${ASSET_ARCH}_${VERSION}_${BUILD_DATE}_${BUILD_TIME}_${REPO_HASH}.${PACKAGE_EXT}"
+          build_root="game-unity/src/Builds/${ASSET_OS}_${ASSET_ARCH}"
+          package_root="$RUNNER_TEMP/lunavale-package/${ASSET_OS}_${ASSET_ARCH}"
+          package_path="$RUNNER_TEMP/${asset_name}"
+
+          if [ ! -d "$build_root" ]; then
+            echo "::error::Unity build output directory not found: $build_root"
+            exit 1
+          fi
+
+          mkdir -p "$package_root"
+          cp -R "$build_root"/. "$package_root"/
+
+          if [ "$PACKAGE_EXT" = "zip" ]; then
+            (cd "$package_root" && zip -qry "$package_path" .)
+          elif [ "$PACKAGE_EXT" = "tar.gz" ]; then
+            tar -C "$package_root" -czf "$package_path" .
+          else
+            echo "::error::Unsupported package extension: $PACKAGE_EXT"
+            exit 1
+          fi
+
+          echo "path=$package_path" >> "$GITHUB_OUTPUT"
+          echo "asset_name=$asset_name" >> "$GITHUB_OUTPUT"
+        env:
+          ASSET_OS: ${{ matrix.asset_os }}
+          ASSET_ARCH: ${{ matrix.asset_arch }}
+          PACKAGE_EXT: ${{ matrix.package_ext }}
+          VERSION: ${{ needs.version-gate.outputs.version }}
+          BUILD_DATE: ${{ needs.version-gate.outputs.build_date }}
+          BUILD_TIME: ${{ needs.version-gate.outputs.build_time }}
+          REPO_HASH: ${{ needs.version-gate.outputs.repo_files_sha256 }}
+
+      - name: Smoke Linux player startup
+        if: matrix.asset_os == 'linux'
+        run: |
+          set -euo pipefail
+          player="game-unity/src/Builds/linux_x64/Lunavale.x86_64"
+          log="$RUNNER_TEMP/lunavale-linux-player-smoke.log"
+
+          if [ ! -f "$player" ]; then
+            echo "::error::Linux player executable not found: $player"
+            exit 1
+          fi
+
+          chmod +x "$player"
+          "$player" -batchmode -nographics -lunavaleSmokeQuit -logFile "$log"
+          if ! grep -q "Lunavale player smoke startup reached" "$log"; then
+            echo "::error::Linux player smoke log did not contain the expected startup marker."
+            cat "$log"
+            exit 1
+          fi
+
+      - name: Upload packaged build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.asset_name }}
+          path: ${{ steps.package.outputs.path }}
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs:
+      - version-gate
+      - build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download packaged build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Write release notes
+        run: |
+          cat > release-notes.md <<EOF
+          Lunavale game build ${VERSION}
+
+          Source repository: Lunavale-Collective/game-unity
+          Source commit: ${SOURCE_SHA}
+          Unity editor version: ${UNITY_EDITOR_VERSION}
+          Unity bundle version: ${VERSION}
+          Build timestamp UTC: ${BUILD_DATE} ${BUILD_TIME}
+          Repo files SHA-256: ${REPO_HASH}
+
+          Platforms:
+          - windows_x64
+          - macos_arm64
+          - linux_x64
+          EOF
+        env:
+          VERSION: ${{ needs.version-gate.outputs.version }}
+          SOURCE_SHA: ${{ needs.version-gate.outputs.source_sha }}
+          UNITY_EDITOR_VERSION: ${{ needs.version-gate.outputs.unity_editor_version }}
+          BUILD_DATE: ${{ needs.version-gate.outputs.build_date }}
+          BUILD_TIME: ${{ needs.version-gate.outputs.build_time }}
+          REPO_HASH: ${{ needs.version-gate.outputs.repo_files_sha256 }}
+
+      - name: Create draft release and upload assets
+        run: |
+          set -euo pipefail
+          prerelease_flag=""
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            prerelease_flag="--prerelease"
+          fi
+
+          gh release create "$VERSION" release-assets/* \
+            --repo Lunavale-Collective/game-builds \
+            --title "$VERSION" \
+            --notes-file release-notes.md \
+            --draft \
+            $prerelease_flag
+
+          gh release edit "$VERSION" \
+            --repo Lunavale-Collective/game-builds \
+            --draft=false
+        env:
+          GH_TOKEN: ${{ secrets.GAME_BUILDS_RELEASE_TOKEN }}
+          VERSION: ${{ needs.version-gate.outputs.version }}
+          IS_PRERELEASE: ${{ needs.version-gate.outputs.is_prerelease }}
