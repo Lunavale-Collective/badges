@@ -15,12 +15,16 @@ jobs:
         repo:
           - service-admin
           - service-auth
+          - service-bot-discord
           - service-database
           - service-economy
+          - service-email
           - service-gateway
           - service-infra
+          - service-mail
           - service-player
           - service-purchase
+          - service-template
           - service-website
 
     steps:
