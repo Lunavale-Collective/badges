@@ -123,6 +123,15 @@ def parse_scalar_yaml(text: str) -> dict[str, str | None]:
     return values
 
 
+def parse_int(value: str | None, default: int = 0) -> int:
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
 def parse_roadmap_body(body: str) -> dict[str, str | None]:
     values: dict[str, str | None] = {}
     for line in body.splitlines():
@@ -426,6 +435,81 @@ def roadmap_phases(issues: dict[str, dict[str, str | None]]) -> dict[str, dict[s
     }
 
 
+def actual_duration_days(issue: dict[str, str | None]) -> int:
+    effort = parse_int(issue.get("effort"))
+    start = parse_iso_date(issue.get("start"))
+    end = parse_iso_date(issue.get("end"))
+    if not start or not end or end < start:
+        return 0 if effort == 0 else 1
+    return (end - start).days + 1
+
+
+def completed_effort_summary(
+    issues: dict[str, dict[str, str | None]],
+) -> dict[str, int | float]:
+    completed = [
+        issue
+        for issue in issues.values()
+        if (issue.get("status") or "").lower() == "complete"
+    ]
+    expected_days = sum(parse_int(issue.get("effort")) for issue in completed)
+    actual_days = sum(actual_duration_days(issue) for issue in completed)
+    delta_days = actual_days - expected_days
+    delta_percent = 0.0 if expected_days == 0 else (delta_days / expected_days) * 100
+    return {
+        "actual_days": actual_days,
+        "count": len(completed),
+        "delta_days": delta_days,
+        "delta_percent": delta_percent,
+        "expected_days": expected_days,
+    }
+
+
+def schedule_variance_color(delta_percent: float) -> str:
+    saved_percent = -delta_percent
+    if saved_percent >= 50:
+        return "1f883d"
+    if saved_percent > 1:
+        return "97ca00"
+    if saved_percent >= -1:
+        return "dfb317"
+    return "cf222e"
+
+
+def format_variance_days(delta_days: int) -> str:
+    if delta_days < 0:
+        return f"Ahead {abs(delta_days)}d"
+    if delta_days > 0:
+        return f"Behind {delta_days}d"
+    return "On Track 0d"
+
+
+def format_variance_percent(delta_percent: float) -> str:
+    if delta_percent < 0:
+        return f"Ahead {abs(delta_percent):.1f}%"
+    if delta_percent > 0:
+        return f"Behind {delta_percent:.1f}%"
+    return "On Track 0.0%"
+
+
+def write_schedule_variance_badges(issues: dict[str, dict[str, str | None]]) -> dict[str, int | float]:
+    summary = completed_effort_summary(issues)
+    color = schedule_variance_color(float(summary["delta_percent"]))
+    write_badge(
+        ROADMAP_OUTPUT_DIR / "schedule-variance.json",
+        label="Schedule Variance",
+        message=format_variance_days(int(summary["delta_days"])),
+        color=color,
+    )
+    write_badge(
+        ROADMAP_OUTPUT_DIR / "schedule-delta.json",
+        label="Schedule Delta",
+        message=format_variance_percent(float(summary["delta_percent"])),
+        color=color,
+    )
+    return summary
+
+
 def current_phase(issues: dict[str, dict[str, str | None]]) -> dict[str, str | None]:
     return roadmap_phases(issues)["current"]
 
@@ -525,7 +609,8 @@ def main() -> int:
         encoding="utf-8",
     )
 
-    phases = roadmap_phases(read_local_issue_files())
+    issues = read_local_issue_files()
+    phases = roadmap_phases(issues)
     for phase_id, phase in phases.items():
         write_badge(
             ROADMAP_OUTPUT_DIR / f"{phase_id}-phase.json",
@@ -537,6 +622,8 @@ def main() -> int:
             json.dumps(phase, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+
+    variance_summary = write_schedule_variance_badges(issues)
 
     roadmap_updated = read_badge_message(WORKFLOW_OUTPUT_DIR / "roadmap-updated.json")
     write_badge(
@@ -550,6 +637,11 @@ def main() -> int:
         print(f"{item['id']}: {item['message']} ({item['source']})")
     for phase_id, phase in phases.items():
         print(f"{phase_id}-phase: {phase['message']}")
+    print(
+        "schedule-variance: "
+        f"{format_variance_days(int(variance_summary['delta_days']))}; "
+        f"{format_variance_percent(float(variance_summary['delta_percent']))}"
+    )
     print(f"release-dates-updated: {roadmap_updated or 'unknown'}")
     return 0
 

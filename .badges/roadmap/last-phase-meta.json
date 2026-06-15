@@ -1,10 +1,10 @@
 {
   "color": "6f42c1",
-  "end": "2026-06-11",
-  "issue_id": "service-database-architecture-layer",
+  "end": "2026-06-14",
+  "issue_id": "unity-account-character-integration",
   "label": "Last Phase",
-  "message": "Service database architecture layer",
+  "message": "Unity account and character integration",
   "parent_id": null,
-  "start": "2026-06-09",
+  "start": "2026-06-14",
   "status": "complete"
 }
